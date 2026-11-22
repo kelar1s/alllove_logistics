@@ -145,26 +145,36 @@ class ValidatorApp:
         )
         self.queue_list.pack(fill="both", expand=True, padx=12, pady=(0, 16))
         self.queue_list.bind("<<ListboxSelect>>", self.on_select_supply)
-        panes.add(left, minsize=260, width=300)
+        panes.add(left, minsize=240, width=270)
 
         right = tk.Frame(panes, bg=PAPER, highlightbackground=LINE, highlightthickness=1)
         self.detail_title = ttk.Label(right, text="Выберите поставку", style="Head.TLabel")
         self.detail_title.pack(anchor="w", padx=16, pady=(16, 4))
-        self.detail_meta = ttk.Label(right, text="", style="Muted.TLabel", background=PAPER, wraplength=640)
+        self.detail_meta = ttk.Label(right, text="", style="Muted.TLabel", background=PAPER, wraplength=720)
         self.detail_meta.pack(anchor="w", padx=16, pady=(0, 8))
         self.docs_frame = tk.Frame(right, bg=PAPER)
         self.docs_frame.pack(fill="x", padx=16, pady=(0, 8))
-        self.items_canvas = tk.Canvas(right, bg=PAPER, highlightthickness=0)
-        scroll = ttk.Scrollbar(right, orient="vertical", command=self.items_canvas.yview)
+
+        items_container = tk.Frame(right, bg=PAPER)
+        items_container.pack(fill="both", expand=True, padx=16, pady=(0, 8))
+
+        self.items_canvas = tk.Canvas(items_container, bg=PAPER, highlightthickness=0)
+        scroll = ttk.Scrollbar(items_container, orient="vertical", command=self.items_canvas.yview)
         self.items_inner = tk.Frame(self.items_canvas, bg=PAPER)
+
+        self._canvas_window = self.items_canvas.create_window((0, 0), window=self.items_inner, anchor="nw")
         self.items_inner.bind(
             "<Configure>",
-            lambda event: self.items_canvas.configure(scrollregion=self.items_canvas.bbox("all")),
+            lambda _event: self.items_canvas.configure(scrollregion=self.items_canvas.bbox("all")),
         )
-        self.items_canvas.create_window((0, 0), window=self.items_inner, anchor="nw")
+        self.items_canvas.bind(
+            "<Configure>",
+            lambda event: self.items_canvas.itemconfigure(self._canvas_window, width=event.width),
+        )
         self.items_canvas.configure(yscrollcommand=scroll.set)
-        self.items_canvas.pack(side="left", fill="both", expand=True, padx=(16, 0))
-        scroll.pack(side="right", fill="y", pady=(0, 8))
+
+        self.items_canvas.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
 
         footer = tk.Frame(right, bg=PAPER, padx=16, pady=12)
         footer.pack(fill="x", side="bottom")
@@ -180,7 +190,7 @@ class ValidatorApp:
             actions, text="Подтвердить проверку", style="Wine.TButton", command=self.submit_check
         )
         self.submit_btn.pack(side="right")
-        panes.add(right, minsize=420)
+        panes.add(right, minsize=480)
 
     def show_login(self) -> None:
         self.work_frame.pack_forget()
@@ -285,29 +295,75 @@ class ValidatorApp:
                 style="Ghost.TButton",
                 command=lambda item=doc: self.open_document(item),
             ).pack(anchor="w", pady=2)
+
         self._clear_items()
-        header = tk.Frame(self.items_inner, bg="#F3EBE3")
-        header.pack(fill="x", pady=(0, 6))
-        for text, width in (("Артикул", 14), ("Наименование", 28), ("План", 8), ("Факт", 8), ("Разница", 14)):
-            tk.Label(header, text=text, bg="#F3EBE3", fg=MUTED, font=("Helvetica Neue", 11), width=width, anchor="w").pack(
-                side="left", padx=4, pady=6
-            )
+        self.items_inner.columnconfigure(0, minsize=105)
+        self.items_inner.columnconfigure(1, weight=1, minsize=150)
+        self.items_inner.columnconfigure(2, minsize=55)
+        self.items_inner.columnconfigure(3, minsize=75)
+        self.items_inner.columnconfigure(4, minsize=120)
+
+        headers = ("Артикул", "Наименование", "План", "Факт", "Разница")
+        for col, text in enumerate(headers):
+            tk.Label(
+                self.items_inner,
+                text=text,
+                bg="#F3EBE3",
+                fg=MUTED,
+                font=("Helvetica Neue", 11, "bold"),
+                anchor="w",
+                padx=8,
+                pady=6,
+            ).grid(row=0, column=col, sticky="nsew", pady=(0, 6))
+
         self.facts = {}
-        for item in supply.get("items") or []:
-            row = tk.Frame(self.items_inner, bg=PAPER)
-            row.pack(fill="x", pady=2)
-            tk.Label(row, text=item.get("sku") or "", bg=PAPER, width=14, anchor="w").pack(side="left", padx=4)
-            tk.Label(row, text=item.get("name") or "", bg=PAPER, width=28, anchor="w").pack(side="left", padx=4)
-            tk.Label(row, text=str(item.get("planned_qty") or 0), bg=PAPER, width=8, anchor="w").pack(side="left", padx=4)
+        for idx, item in enumerate(supply.get("items") or [], start=1):
+            tk.Label(
+                self.items_inner,
+                text=item.get("sku") or "",
+                bg=PAPER,
+                fg=INK,
+                font=("Helvetica Neue", 12),
+                anchor="w",
+                padx=8,
+                pady=4,
+            ).grid(row=idx, column=0, sticky="w")
+
+            tk.Label(
+                self.items_inner,
+                text=item.get("name") or "",
+                bg=PAPER,
+                fg=INK,
+                font=("Helvetica Neue", 12),
+                anchor="w",
+                padx=8,
+                pady=4,
+            ).grid(row=idx, column=1, sticky="ew")
+
+            tk.Label(
+                self.items_inner,
+                text=str(item.get("planned_qty") or 0),
+                bg=PAPER,
+                fg=INK,
+                font=("Helvetica Neue", 12),
+                anchor="w",
+                padx=8,
+                pady=4,
+            ).grid(row=idx, column=2, sticky="w")
+
             value = tk.StringVar(value="" if item.get("actual_qty") is None else str(item["actual_qty"]))
             self.facts[item["id"]] = value
-            entry = ttk.Entry(row, textvariable=value, width=8)
-            entry.pack(side="left", padx=4)
-            diff = ttk.Label(row, text="", style="Paper.TLabel", width=14)
-            diff.pack(side="left", padx=4)
-            value.trace_add("write", lambda *_args, current=item, label=diff, var=value: self._update_diff(current, var, label))
+            entry = ttk.Entry(self.items_inner, textvariable=value, width=7)
+            entry.grid(row=idx, column=3, sticky="w", padx=6, pady=3)
+
+            diff = ttk.Label(self.items_inner, text="", style="Paper.TLabel")
+            diff.grid(row=idx, column=4, sticky="w", padx=6, pady=3)
+
+            value.trace_add(
+                "write",
+                lambda *_args, current=item, label=diff, var=value: self._update_diff(current, var, label),
+            )
             self._update_diff(item, value, diff)
-            self.item_rows.append(row)
         self._update_submit_label()
 
     def _update_diff(self, item: dict[str, Any], var: tk.StringVar, label: ttk.Label) -> None:

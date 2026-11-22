@@ -1,13 +1,26 @@
 version: '3'
 
 vars:
-  SYS_PYTHON: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
   PYTHON: '{{if eq OS "windows"}}./venv/Scripts/python.exe{{else}}./venv/bin/python{{end}}'
+  SYS_PYTHON:
+    sh: |
+      if [ "{{OS}}" = "windows" ]; then
+        if command -v py >/dev/null 2>&1; then
+          echo "py -3"
+        else
+          echo "python"
+        fi
+      else
+        for cmd in python3.12 python3.11 python3.10 python3; do
+          if command -v "$cmd" >/dev/null 2>&1; then
+            echo "$cmd"
+            break
+          fi
+        done
+      fi
 
 tasks:
-  # =========================================================================
-  # ПОЛНЫЙ DOCKER-РЕЖИМ (Работает одинаково на Windows, Linux и macOS)
-  # =========================================================================
+  # Docker Режим (Работает одинаково на Windows, Linux и macOS)
   up:
     desc: "[Docker] Поднять весь проект (БД + миграции + сиды + Backend + Frontend)"
     cmds:
@@ -68,9 +81,7 @@ tasks:
       - docker compose --profile https down -v
       - docker compose up -d
 
-  # =========================================================================
-  # ЛОКАЛЬНЫЙ ГИБРИДНЫЙ РЕЖИМ (БД в Docker, код локально)
-  # =========================================================================
+  # Локальный гибридный режим (БД в Docker, код локально)
   local:install:
     desc: "[Local] Создать venv и установить зависимости (Python + Node.js)"
     cmds:
